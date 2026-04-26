@@ -304,6 +304,9 @@ func (tc InvalidMissingAncestorReOrgSyncTest) Execute(t *test.Env) {
 			}
 		},
 		OnGetPayload: func() {
+			if !tc.EmptyTransactions {
+				t.Logf("DEBUG: LatestPayloadBuilt txCount=%d, producer=%s", len(t.CLMock.LatestPayloadBuilt.Transactions), t.CLMock.NextBlockProducer.ID())
+			}
 			var (
 				sidePayload *typ.ExecutableData
 				err         error

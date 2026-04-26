@@ -110,3 +110,5 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/ethereum/go-ethereum => github.com/newmanifold/go-ethereum v1.16.8-0.20260426233834-b4f792cc4453

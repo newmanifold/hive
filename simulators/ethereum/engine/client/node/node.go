@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/stateless"
+	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth"
@@ -534,10 +535,15 @@ func (n *GethNode) ForkchoiceUpdatedV3(ctx context.Context, fcs *beacon.Forkchoi
 }
 
 func (n *GethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, error) {
+	pendingCount := 0
+	for _, txs := range n.eth.TxPool().Pending(txpool.PendingFilter{}) {
+		pendingCount += len(txs)
+	}
 	p, err := n.api.GetPayloadV1(*payloadId)
 	if p == nil || err != nil {
 		return typ.ExecutableData{}, err
 	}
+	fmt.Printf("[HIVE-DIAG] GetPayloadV1: payloadId=%v txsInPayload=%d pendingInPool=%d\n", payloadId, len(p.Transactions), pendingCount)
 	return typ.FromBeaconExecutableData(p)
 }
 

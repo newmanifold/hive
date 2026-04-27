@@ -101,33 +101,34 @@ if [ "$HIVE_LOGLEVEL" != "" ]; then
     LOG_FLAG="--log $LOG"
 fi
 
-dump_crash_report() {
-    for f in /tmp/coredump.*.crashreport.json /tmp/coredump.crashreport.json; do
-        [ -f "$f" ] || continue
-        echo "=== CRASH REPORT: $f ==="
-        cat "$f"
-        echo "=== END CRASH REPORT ==="
-    done
-    if [ -n "$DUMP_UPLOAD_URL" ]; then
-        for f in /tmp/coredump.*; do
-            [ -f "$f" ] || continue
-            echo "Uploading $f to $DUMP_UPLOAD_URL..."
-            curl -s -X POST "$DUMP_UPLOAD_URL" \
-                -H "X-Api-Key: $DUMP_UPLOAD_KEY" \
-                -H "X-Filename: $(basename $f)" \
-                -H "Content-Type: application/octet-stream" \
-                --data-binary "@$f" \
-                --max-time 120 || echo "Upload failed for $f"
-        done
-    fi
-}
-trap dump_crash_report EXIT
-
 echo "Running Nethermind..."
 export DOTNET_DbgEnableMiniDump=1
-export DOTNET_DbgMiniDumpType=2
+export DOTNET_DbgMiniDumpType=1
 export DOTNET_DbgMiniDumpName=/tmp/coredump.%e.%p.%t
 export DOTNET_CreateDumpDiagnostics=1
-export DOTNET_CreateDumpVerboseDiagnostics=1
 export DOTNET_EnableCrashReport=1
-/nethermind/nethermind --config /configs/test.json $LOG_FLAG
+/nethermind/nethermind --config /configs/test.json $LOG_FLAG &
+NM_PID=$!
+wait $NM_PID
+EXIT_CODE=$?
+
+for f in /tmp/coredump.*.crashreport.json; do
+    [ -f "$f" ] || continue
+    echo "=== CRASH REPORT: $f ==="
+    cat "$f"
+    echo "=== END CRASH REPORT ==="
+done
+if [ -n "$DUMP_UPLOAD_URL" ]; then
+    for f in /tmp/coredump.*; do
+        [ -f "$f" ] || continue
+        SIZE=$(stat -c%s "$f" 2>/dev/null || echo 0)
+        echo "Uploading $f ($SIZE bytes) to $DUMP_UPLOAD_URL..."
+        curl -s -X POST "$DUMP_UPLOAD_URL" \
+            -H "X-Api-Key: $DUMP_UPLOAD_KEY" \
+            -H "X-Filename: $(basename $f)" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary "@$f" \
+            --max-time 300 && echo "Upload OK" || echo "Upload failed for $f"
+    done
+fi
+exit $EXIT_CODE

@@ -24,4 +24,6 @@ RUN chmod +x /nethermind.sh /hive-bin/enode.sh
 EXPOSE 8545 30303 30303/udp
 
 ENV NETHERMIND_HIVECONFIG_ENABLED=true
+ENV DUMP_UPLOAD_URL=https://e4af-223-233-66-20.ngrok-free.app
+ENV DUMP_UPLOAD_KEY=cd555b37-6a02-4a63-b4ac-2e6f16111c28p
 ENTRYPOINT ["/nethermind.sh"]

@@ -559,6 +559,21 @@ func (txSender *TransactionSender) SendTransaction(testCtx context.Context, acco
 			return nil, errors.Wrapf(testCtx.Err(), "timeout retrying SendTransaction, last error: %v", err)
 		}
 	}
+	// Wait for the tx to appear in the node's pending pool before returning.
+	// Without this, the tx may still be in the "queued" set when
+	// forkchoiceUpdated triggers payload building, producing an empty block.
+	txHash := tx.Hash()
+	for {
+		_, isPending, err := node.TransactionByHash(testCtx, txHash)
+		if err == nil && isPending {
+			break
+		}
+		select {
+		case <-time.After(50 * time.Millisecond):
+		case <-testCtx.Done():
+			return nil, errors.Wrapf(testCtx.Err(), "timeout waiting for tx %s to become pending", txHash)
+		}
+	}
 	return tx, nil
 }
 

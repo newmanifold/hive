@@ -534,22 +534,30 @@ func (n *GethNode) ForkchoiceUpdatedV3(ctx context.Context, fcs *beacon.Forkchoi
 	return fcr, err
 }
 
-func (n *GethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, error) {
-	pendingCount := 0
-	for _, txs := range n.eth.TxPool().Pending(txpool.PendingFilter{}) {
-		pendingCount += len(txs)
-	}
-	p, err := n.api.GetPayloadV1(*payloadId)
+func (n *GethNode) getPayloadFull(payloadId *beacon.PayloadID) (*beacon.ExecutionPayloadEnvelope, error) {
+	p, err := n.api.GetPayloadFull(*payloadId)
 	if p == nil || err != nil {
+		return nil, err
+	}
+	txCount := 0
+	if p.ExecutionPayload != nil {
+		txCount = len(p.ExecutionPayload.Transactions)
+	}
+	fmt.Printf("[HIVE-DIAG] getPayloadFull: payloadId=%v txsInPayload=%d\n", payloadId, txCount)
+	return p, nil
+}
+
+func (n *GethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, error) {
+	p, err := n.getPayloadFull(payloadId)
+	if err != nil {
 		return typ.ExecutableData{}, err
 	}
-	fmt.Printf("[HIVE-DIAG] GetPayloadV1: payloadId=%v txsInPayload=%d pendingInPool=%d\n", payloadId, len(p.Transactions), pendingCount)
-	return typ.FromBeaconExecutableData(p)
+	return typ.FromBeaconExecutableData(p.ExecutionPayload)
 }
 
 func (n *GethNode) GetPayloadV2(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, *big.Int, error) {
-	p, err := n.api.GetPayloadV2(*payloadId)
-	if p == nil || err != nil {
+	p, err := n.getPayloadFull(payloadId)
+	if err != nil {
 		return typ.ExecutableData{}, nil, err
 	}
 	ed, err := typ.FromBeaconExecutableData(p.ExecutionPayload)
@@ -557,8 +565,8 @@ func (n *GethNode) GetPayloadV2(ctx context.Context, payloadId *beacon.PayloadID
 }
 
 func (n *GethNode) GetPayloadV3(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, *bool, error) {
-	p, err := n.api.GetPayloadV3(*payloadId)
-	if p == nil || err != nil {
+	p, err := n.getPayloadFull(payloadId)
+	if err != nil {
 		return typ.ExecutableData{}, nil, nil, nil, err
 	}
 	ed, err := typ.FromBeaconExecutableData(p.ExecutionPayload)
@@ -714,7 +722,15 @@ func (n *GethNode) NonceAt(ctx context.Context, account common.Address, blockNum
 }
 
 func (n *GethNode) TransactionByHash(ctx context.Context, hash common.Hash) (tx *types.Transaction, isPending bool, err error) {
-	panic("NOT IMPLEMENTED")
+	pending := n.eth.TxPool().Pending(txpool.PendingFilter{})
+	for _, txs := range pending {
+		for _, lazy := range txs {
+			if resolved := lazy.Resolve(); resolved != nil && resolved.Hash() == hash {
+				return resolved, true, nil
+			}
+		}
+	}
+	return nil, false, fmt.Errorf("transaction %s not found in pending pool", hash)
 }
 
 func (n *GethNode) PendingTransactionCount(ctx context.Context) (uint, error) {

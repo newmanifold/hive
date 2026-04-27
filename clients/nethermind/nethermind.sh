@@ -101,5 +101,21 @@ if [ "$HIVE_LOGLEVEL" != "" ]; then
     LOG_FLAG="--log $LOG"
 fi
 
+dump_crash_report() {
+    for f in /tmp/coredump.*.crashreport.json; do
+        [ -f "$f" ] || continue
+        echo "=== CRASH REPORT: $f ==="
+        cat "$f"
+        echo "=== END CRASH REPORT ==="
+    done
+}
+trap dump_crash_report EXIT
+
 echo "Running Nethermind..."
+export DOTNET_DbgEnableMiniDump=1
+export DOTNET_DbgMiniDumpType=1
+export DOTNET_DbgMiniDumpName=/tmp/coredump.%p
+export DOTNET_CreateDumpDiagnostics=1
+export DOTNET_CreateDumpVerboseDiagnostics=1
+export DOTNET_EnableCrashReport=1
 /nethermind/nethermind --config /configs/test.json $LOG_FLAG

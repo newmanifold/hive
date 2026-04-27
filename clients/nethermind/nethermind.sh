@@ -104,6 +104,7 @@ fi
 echo "Running Nethermind..."
 export DOTNET_DbgEnableMiniDump=1
 export DOTNET_DbgMiniDumpType=1
+export DOTNET_HeapVerify=1
 export DOTNET_DbgMiniDumpName=/tmp/coredump.%e.%p.%t
 export DOTNET_CreateDumpDiagnostics=1
 export DOTNET_EnableCrashReport=1
@@ -113,6 +114,9 @@ set +e
 wait $NM_PID
 EXIT_CODE=$?
 set -e
+
+# Ignore SIGTERM during dump upload so hive container cleanup doesn't kill us
+trap '' TERM
 
 for f in /tmp/coredump.*.crashreport.json; do
     [ -f "$f" ] || continue

@@ -109,8 +109,10 @@ export DOTNET_CreateDumpDiagnostics=1
 export DOTNET_EnableCrashReport=1
 /nethermind/nethermind --config /configs/test.json $LOG_FLAG &
 NM_PID=$!
+set +e
 wait $NM_PID
 EXIT_CODE=$?
+set -e
 
 for f in /tmp/coredump.*.crashreport.json; do
     [ -f "$f" ] || continue

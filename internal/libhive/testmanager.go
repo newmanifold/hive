@@ -578,7 +578,15 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 		}
 	}
 
-	// Stop running clients.
+	// Stop running clients. If the test failed, give containers a grace period
+	// for crash dump upload before force-removing them.
+	if !testCase.SummaryResult.Pass {
+		for _, v := range testCase.ClientInfo {
+			if v.wait != nil {
+				manager.backend.StopContainer(v.ID, 120)
+			}
+		}
+	}
 	for _, v := range testCase.ClientInfo {
 		if v.wait != nil {
 			manager.backend.DeleteContainer(v.ID)

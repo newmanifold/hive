@@ -209,12 +209,14 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	return info, checkErr
 }
 
-// DeleteContainer removes the given container. If the container is running, it is stopped
-// with a grace period to allow crash dump uploads to complete.
+// StopContainer sends SIGTERM and waits up to timeout seconds for the container to exit.
+func (b *ContainerBackend) StopContainer(containerID string, timeout uint) error {
+	return b.client.StopContainer(containerID, timeout)
+}
+
+// DeleteContainer removes the given container. If the container is running, it is stopped.
 func (b *ContainerBackend) DeleteContainer(containerID string) error {
 	b.logger.Debug("removing container", "container", containerID[:8])
-	timeout := uint(60)
-	b.client.StopContainer(containerID, timeout)
 	err := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
 	if err != nil {
 		b.logger.Error("can't remove container", "container", containerID[:8], "err", err)

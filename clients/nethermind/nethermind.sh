@@ -107,33 +107,26 @@ export DOTNET_DbgMiniDumpType=1
 export DOTNET_DbgMiniDumpName=/tmp/coredump.%e.%p.%t
 export DOTNET_CreateDumpDiagnostics=1
 export DOTNET_EnableCrashReport=1
-/nethermind/nethermind --config /configs/test.json $LOG_FLAG &
-NM_PID=$!
-set +e
-wait $NM_PID
-EXIT_CODE=$?
-set -e
 
-# Ignore SIGTERM during dump upload so hive container cleanup doesn't kill us
-trap '' TERM
-
-for f in /tmp/coredump.*.crashreport.json; do
-    [ -f "$f" ] || continue
-    echo "=== CRASH REPORT: $f ==="
-    cat "$f"
-    echo "=== END CRASH REPORT ==="
-done
+# Background watcher: uploads crash dumps as soon as they appear
 if [ -n "$DUMP_UPLOAD_URL" ]; then
-    for f in /tmp/coredump.*; do
-        [ -f "$f" ] || continue
-        SIZE=$(stat -c%s "$f" 2>/dev/null || echo 0)
-        echo "Uploading $f ($SIZE bytes) to $DUMP_UPLOAD_URL..."
-        curl -s -X POST "$DUMP_UPLOAD_URL" \
-            -H "X-Api-Key: $DUMP_UPLOAD_KEY" \
-            -H "X-Filename: $(basename $f)" \
-            -H "Content-Type: application/octet-stream" \
-            --data-binary "@$f" \
-            --max-time 300 && echo "Upload OK" || echo "Upload failed for $f"
-    done
+    (while true; do
+        for f in /tmp/coredump.*; do
+            [ -f "$f" ] || continue
+            DONE="/tmp/.uploaded_$(basename $f)"
+            [ -f "$DONE" ] && continue
+            touch "$DONE"
+            SIZE=$(stat -c%s "$f" 2>/dev/null || echo 0)
+            echo "Uploading $f ($SIZE bytes)..."
+            curl -s -X POST "$DUMP_UPLOAD_URL" \
+                -H "X-Api-Key: $DUMP_UPLOAD_KEY" \
+                -H "X-Filename: $(basename $f)" \
+                -H "Content-Type: application/octet-stream" \
+                --data-binary "@$f" \
+                --max-time 300 && echo "Upload OK: $f" || echo "Upload failed: $f"
+        done
+        sleep 2
+    done) &
 fi
-exit $EXIT_CODE
+
+/nethermind/nethermind --config /configs/test.json $LOG_FLAG

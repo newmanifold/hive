@@ -104,7 +104,6 @@ fi
 echo "Running Nethermind..."
 export DOTNET_DbgEnableMiniDump=1
 export DOTNET_DbgMiniDumpType=1
-export DOTNET_HeapVerify=1
 export DOTNET_DbgMiniDumpName=/tmp/coredump.%e.%p.%t
 export DOTNET_CreateDumpDiagnostics=1
 export DOTNET_EnableCrashReport=1
